@@ -339,21 +339,58 @@
     });
     y += 18;
 
-    /* --- Allocation Chart --- */
+    /* --- Allocation Chart + Legend --- */
     const chartCanvas = $('#chart-alloc-position');
-    if (chartCanvas) {
-      checkPage(75);
+    const allocChart = chartInstances[0];
+    if (chartCanvas && allocChart) {
+      const allocLabels = allocChart.data.labels || [];
+      const allocValues = allocChart.data.datasets[0].data || [];
+      const allocColors = allocChart.data.datasets[0].backgroundColor || [];
+      const allocTotal = allocValues.reduce((s, v) => s + v, 0);
+      const legendLineH = 5;
+      const chartSize = 60;
+      const legendH = allocLabels.length * legendLineH;
+      const sectionH = Math.max(chartSize, legendH) + 10;
+
+      checkPage(sectionH + 10);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0);
       doc.text('Allocation by Position', margin, y);
       y += 4;
+
+      const chartY = y;
       try {
         const imgData = chartCanvas.toDataURL('image/png');
-        const chartSize = 60;
         doc.addImage(imgData, 'PNG', margin, y, chartSize, chartSize);
-        y += chartSize + 6;
-      } catch (_) { y += 4; }
+      } catch (_) {}
+
+      /* Legend to the right of chart */
+      const legendX = margin + chartSize + 8;
+      const legendW = colW - chartSize - 8;
+      let ly = chartY + 2;
+      doc.setFontSize(6.5);
+      allocLabels.forEach((lbl, i) => {
+        if (!allocChart.getDataVisibility(i)) return;
+        const color = allocColors[i] || '#999';
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        doc.setFillColor(r, g, b);
+        doc.rect(legendX, ly - 2.5, 3, 3, 'F');
+
+        const pct = allocTotal ? ((allocValues[i] / allocTotal) * 100).toFixed(1) : '0.0';
+        let txt = lbl + '  ' + formatUSD(allocValues[i]) + ' (' + pct + '%)';
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60);
+        while (txt.length > 3 && doc.getTextWidth(txt) > legendW - 6) {
+          txt = txt.slice(0, -4) + '...';
+        }
+        doc.text(txt, legendX + 5, ly);
+        ly += legendLineH;
+      });
+      doc.setTextColor(0);
+      y += Math.max(chartSize, ly - chartY) + 6;
     }
 
     /* --- Helper: draw table --- */
