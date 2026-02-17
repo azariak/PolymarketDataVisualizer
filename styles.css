@@ -537,7 +537,75 @@ body {
   justify-content: center;
 }
 
-.chart-wrap-alloc { height: 400px; }
+.chart-wrap-alloc {
+  height: auto;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.alloc-chart-col {
+  flex: 0 0 380px;
+  height: 380px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.alloc-chart-col canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.alloc-legend {
+  flex: 0 0 auto;
+  max-width: 300px;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  max-height: 380px;
+  padding-right: 4px;
+}
+
+.alloc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+}
+
+.alloc-legend-swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.alloc-legend-text {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alloc-legend-link {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: text-decoration-color 0.15s;
+}
+
+.alloc-legend-link:hover {
+  text-decoration-color: var(--accent);
+}
 .chart-wrap-bar { height: 260px; }
 .chart-wrap-line { height: 300px; }
 .chart-wrap canvas { max-width: 100%; max-height: 100%; }
@@ -683,7 +751,7 @@ body {
   position: fixed;
   z-index: 100;
   width: 420px;
-  height: 500px;
+  height: 400px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -763,6 +831,21 @@ body {
   .brand-title, .brand-title-accent { font-size: 3.2rem; }
   .top-bar { flex-direction: column; gap: 10px; align-items: flex-start; }
   .sort-controls { flex-wrap: wrap; }
+  .chart-wrap-alloc {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .alloc-chart-col {
+    flex: 0 0 auto;
+    height: 280px;
+    margin: 0;
+  }
+  .alloc-legend {
+    position: static;
+    transform: none;
+    max-height: 180px;
+    overflow-y: auto;
+  }
 }
 
 @media (max-width: 480px) {

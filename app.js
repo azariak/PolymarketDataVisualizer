@@ -289,13 +289,12 @@
   function renderAllocationByPosition(positions) {
     const ctx = $('#chart-alloc-position').getContext('2d');
     const chartBorder = getCSSVar('--chart-border');
-    const labelColor = getCSSVar('--chart-label');
 
     const sorted = [...positions]
       .map(p => {
         const full = (p.title || 'Unknown') + (p.outcome ? ` (${p.outcome})` : '');
         return {
-          label: full.length > 30 ? full.slice(0, 30) + '…' : full,
+          label: full.length > 50 ? full.slice(0, 50) + '…' : full,
           fullLabel: full,
           slug: p.slug || null,
           value: Number(p.currentValue || 0),
@@ -305,8 +304,7 @@
       .sort((a, b) => b.value - a.value);
 
     const { labels, fullLabels, slugs, values } = buildPieData(sorted, 14);
-
-    let pieHoverTimeout = null;
+    const colors = CHART_COLORS.slice(0, labels.length);
 
     const chart = new Chart(ctx, {
       type: 'doughnut',
@@ -314,7 +312,7 @@
         labels,
         datasets: [{
           data: values,
-          backgroundColor: CHART_COLORS.slice(0, labels.length),
+          backgroundColor: colors,
           borderColor: chartBorder,
           borderWidth: 2,
         }],
@@ -323,65 +321,8 @@
         responsive: true,
         maintainAspectRatio: false,
         cutout: '55%',
-        onHover: function (e, elements) {
-          const canvas = e.chart.canvas;
-          if (elements.length > 0) {
-            const idx = elements[0].index;
-            const slug = slugs[idx];
-            canvas.style.cursor = slug ? 'pointer' : 'default';
-            if (slug) {
-              clearTimeout(pieHoverTimeout);
-              clearTimeout(embedTimeout);
-              const canvasRect = canvas.getBoundingClientRect();
-              const pt = { x: canvasRect.left + elements[0].element.x, y: canvasRect.top + elements[0].element.y };
-              showEmbedPopover(pt, slug);
-            } else {
-              hideEmbedPopover();
-            }
-          } else {
-            canvas.style.cursor = 'default';
-            pieHoverTimeout = setTimeout(() => hideEmbedPopover(), 100);
-          }
-        },
         plugins: {
-          legend: {
-            position: 'right',
-            onHover: function (e, legendItem) {
-              const canvas = e.chart.canvas;
-              canvas.title = fullLabels[legendItem.index] || '';
-              canvas.style.cursor = 'pointer';
-              const slug = slugs[legendItem.index];
-              if (slug) {
-                clearTimeout(embedTimeout);
-                const canvasRect = canvas.getBoundingClientRect();
-                showEmbedPopover({ x: canvasRect.right - 80, y: canvasRect.top + 40 }, slug);
-              }
-            },
-            onLeave: function (e) {
-              const canvas = e.chart.canvas;
-              canvas.title = '';
-              canvas.style.cursor = 'default';
-              hideEmbedPopover();
-            },
-            labels: {
-              boxWidth: 10,
-              padding: 8,
-              font: { size: 10 },
-              color: labelColor,
-              generateLabels: function (chart) {
-                const data = chart.data;
-                return data.labels.map((label, i) => ({
-                  text: label.length > 28 ? label.slice(0, 28) + '…' : label,
-                  fillStyle: data.datasets[0].backgroundColor[i],
-                  fontColor: labelColor,
-                  strokeStyle: 'transparent',
-                  lineWidth: 0,
-                  index: i,
-                  hidden: !chart.getDataVisibility(i),
-                }));
-              },
-            },
-          },
+          legend: { display: false },
           tooltip: {
             callbacks: {
               title: (items) => fullLabels[items[0].dataIndex] || labels[items[0].dataIndex],
@@ -392,6 +333,40 @@
       },
     });
     chartInstances.push(chart);
+
+    /* Build HTML legend */
+    const legendEl = document.getElementById('alloc-legend');
+    legendEl.innerHTML = '';
+    labels.forEach((label, i) => {
+      const item = document.createElement('div');
+      item.className = 'alloc-legend-item';
+      const slug = slugs[i];
+      if (slug) item.dataset.slug = slug;
+
+      const swatch = document.createElement('span');
+      swatch.className = 'alloc-legend-swatch';
+      swatch.style.backgroundColor = colors[i];
+
+      const text = document.createElement('span');
+      text.className = 'alloc-legend-text' + (slug ? ' alloc-legend-link' : '');
+      const display = fullLabels[i] || label;
+      text.textContent = display.length > 60 ? display.slice(0, 60) + '…' : display;
+      text.title = display;
+
+      item.appendChild(swatch);
+      item.appendChild(text);
+      legendEl.appendChild(item);
+
+      if (slug) {
+        item.addEventListener('mouseenter', () => {
+          clearTimeout(embedTimeout);
+          showEmbedPopover(item, slug);
+        });
+        item.addEventListener('mouseleave', () => {
+          hideEmbedPopover();
+        });
+      }
+    });
   }
 
   function renderWinnersLosers(positions, closedPositions) {
@@ -772,7 +747,7 @@
 
     /* anchor can be a DOM element or a {x, y} point */
     const popW = 420;
-    const popH = 500;
+    const popH = 400;
     let left, top;
 
     if (anchor instanceof HTMLElement) {
