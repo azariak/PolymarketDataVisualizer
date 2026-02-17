@@ -826,29 +826,119 @@ body {
 }
 
 @media (max-width: 768px) {
-  .metrics-strip { grid-template-columns: repeat(2, 1fr); }
-  .charts-row { grid-template-columns: 1fr; }
-  .brand-title, .brand-title-accent { font-size: 3.2rem; }
-  .top-bar { flex-direction: column; gap: 10px; align-items: flex-start; }
-  .sort-controls { flex-wrap: wrap; }
-  .chart-wrap-alloc {
+  /* Dashboard shell */
+  .dashboard { padding: 0 16px 60px; }
+
+  /* Metrics */
+  .metrics-strip { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+  .metric-card { padding: 14px 16px; }
+  .metric-value { font-size: 1.1rem; }
+
+  /* Charts */
+  .charts-row { grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+  .chart-panel { padding: 18px 14px; }
+  .chart-wrap { height: 220px; }
+  .chart-wrap-bar { height: 200px; }
+  .chart-wrap-line { height: 240px; }
+
+  /* Pie chart allocation — needs .chart-wrap prefix for specificity over .chart-wrap height */
+  .chart-wrap.chart-wrap-alloc {
     flex-direction: column;
     align-items: stretch;
+    height: auto;
+    overflow: visible;
   }
   .alloc-chart-col {
     flex: 0 0 auto;
     height: 280px;
-    margin: 0;
+    margin: 0 auto;
+    width: 280px;
   }
   .alloc-legend {
     position: static;
     transform: none;
+    max-width: none;
     max-height: 180px;
     overflow-y: auto;
+    margin-top: 12px;
+  }
+
+  /* Top bar */
+  .top-bar {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 16px 0;
+    margin-bottom: 20px;
+  }
+  .top-address {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tables */
+  .table-section { padding: 16px 12px; }
+  .sort-controls { flex-wrap: wrap; gap: 5px; }
+  .data-table .td-title { max-width: 160px; }
+
+  /* Entry screen */
+  .brand-title, .brand-title-accent { font-size: 3.2rem; }
+  .brand-sub { font-size: 0.95rem; }
+
+  /* Embed popover */
+  .embed-popover {
+    width: calc(100vw - 24px);
+    max-width: 420px;
+    left: 12px !important;
+    right: 12px !important;
+    height: 360px;
   }
 }
 
 @media (max-width: 480px) {
-  .metrics-strip { grid-template-columns: 1fr; }
+  .dashboard { padding: 0 12px 48px; }
+
+  /* Metrics single column */
+  .metrics-strip { grid-template-columns: 1fr; gap: 8px; }
+  .metric-card { padding: 12px 14px; gap: 4px; }
+  .metric-value { font-size: 1rem; }
+
+  /* Entry screen */
   .brand-title, .brand-title-accent { font-size: 2.5rem; }
+  .brand-sub { font-size: 0.88rem; margin-bottom: 28px; }
+  .entry-inner { padding: 0 16px; }
+  .input-prefix { padding: 14px 0 14px 14px; font-size: 0.85rem; }
+  #address-input { padding: 14px 14px 14px 4px; font-size: 0.85rem; }
+  .load-btn { padding: 13px 20px; font-size: 0.82rem; }
+
+  /* Charts */
+  .chart-panel { padding: 14px 10px; border-radius: 10px; }
+  .panel-title { font-size: 0.9rem; margin-bottom: 14px; padding-bottom: 10px; }
+  .chart-wrap { height: 200px; }
+  .chart-wrap-bar { height: 180px; }
+  .chart-wrap-line { height: 200px; }
+
+  /* Pie chart */
+  .chart-wrap.chart-wrap-alloc { height: auto; overflow: visible; }
+  .alloc-chart-col { width: 240px; height: 240px; }
+
+  /* Tables */
+  .table-section { padding: 14px 10px; border-radius: 10px; }
+  .table-controls { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .data-table .td-title { max-width: 130px; font-size: 0.78rem; }
+  .data-table td { padding: 10px 10px; font-size: 0.75rem; }
+  .data-table th { padding: 8px 10px; font-size: 0.6rem; }
+
+  /* Top bar */
+  .top-bar-left { flex-wrap: wrap; gap: 8px; }
+  .top-address { max-width: 160px; font-size: 0.7rem; }
+  .back-btn { padding: 7px 14px; font-size: 0.7rem; }
+
+  /* Embed popover */
+  .embed-popover { height: 320px; }
+
+  /* Sort buttons */
+  .sort-btn, .closed-sort-btn { font-size: 0.62rem; padding: 4px 8px; }
 }
