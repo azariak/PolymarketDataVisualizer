@@ -537,6 +537,8 @@ body {
   padding: 24px;
   box-shadow: var(--shadow-sm);
   transition: background 0.3s, border-color 0.3s;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .chart-panel-wide { grid-column: 1 / -1; }
@@ -859,7 +861,9 @@ body {
 .activity-timeline {
   max-height: 480px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+  min-width: 0;
 }
 
 .tl-day {
@@ -937,7 +941,8 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .tl-side {
@@ -968,6 +973,8 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tl-title-link {
