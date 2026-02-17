@@ -531,7 +531,7 @@
       .map(p => {
         const full = (p.title || 'Unknown') + (p.outcome ? ` (${p.outcome})` : '');
         return {
-          label: full.length > 50 ? full.slice(0, 50) + '…' : full,
+          label: full.length > 65 ? full.slice(0, 65) + '…' : full,
           fullLabel: full,
           slug: p.slug || null,
           value: Number(p.currentValue || 0),
@@ -591,7 +591,7 @@
       const text = document.createElement('span');
       text.className = 'alloc-legend-text' + (slug ? ' alloc-legend-link' : '');
       const display = fullLabels[i] || label;
-      text.textContent = display.length > 60 ? display.slice(0, 60) + '…' : display;
+      text.textContent = display.length > 75 ? display.slice(0, 75) + '…' : display;
       text.title = display;
 
       /* Click swatch to toggle slice visibility */
@@ -641,7 +641,7 @@
       measure.font = legendFont;
       const legendLines = labels.map((lbl, i) => {
         const full = fullLabels[i] || lbl;
-        const display = full.length > 75 ? full.slice(0, 75) + '…' : full;
+        const display = full.length > 100 ? full.slice(0, 100) + '…' : full;
         const pct = total ? ((values[i] / total) * 100).toFixed(1) : '0.0';
         return `${display}  ${formatUSD(values[i])} (${pct}%)`;
       });
@@ -1112,9 +1112,9 @@
           html += '<span class="tl-type">' + escapeHTML(typeLabel) + '</span> ';
         }
         if (slug) {
-          html += '<span class="tl-title tl-title-link" data-slug="' + escapeHTML(slug) + '">' + escapeHTML(title.length > 60 ? title.slice(0, 60) + '\u2026' : title) + '</span>';
+          html += '<span class="tl-title tl-title-link" data-slug="' + escapeHTML(slug) + '">' + escapeHTML(title.length > 75 ? title.slice(0, 75) + '\u2026' : title) + '</span>';
         } else {
-          html += '<span class="tl-title">' + escapeHTML(title.length > 60 ? title.slice(0, 60) + '\u2026' : title) + '</span>';
+          html += '<span class="tl-title">' + escapeHTML(title.length > 75 ? title.slice(0, 75) + '\u2026' : title) + '</span>';
         }
         html += '</div>';
 
