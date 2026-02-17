@@ -339,24 +339,23 @@ body {
 
 /* ---------- THEME TOGGLE ---------- */
 .theme-toggle {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
   color: var(--text-secondary);
-  font-size: 1rem;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 9px 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
 }
 
 .theme-toggle:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .theme-toggle .icon-sun { display: none; }
