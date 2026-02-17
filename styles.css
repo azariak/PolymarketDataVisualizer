@@ -586,6 +586,8 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 2px;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
 
 .alloc-legend-text {

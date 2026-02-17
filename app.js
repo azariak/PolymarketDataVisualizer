@@ -363,6 +363,16 @@
       text.textContent = display.length > 60 ? display.slice(0, 60) + '…' : display;
       text.title = display;
 
+      /* Click swatch to toggle slice visibility */
+      swatch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        chart.toggleDataVisibility(i);
+        chart.update();
+        const hidden = !chart.getDataVisibility(i);
+        item.style.opacity = hidden ? '0.4' : '';
+        swatch.style.opacity = hidden ? '0.35' : '';
+      });
+
       item.appendChild(swatch);
       item.appendChild(text);
       legendEl.appendChild(item);
@@ -405,11 +415,77 @@
     const winners = sorted.filter(p => p.pnl > 0).slice(0, 5);
     const losers = sorted.filter(p => p.pnl < 0).slice(-5).reverse();
 
+    /* Plugin: draw underline beneath y-axis labels that have slugs */
+    const labelUnderlinePlugin = {
+      id: 'labelUnderline',
+      afterDraw(chart) {
+        const slugList = chart.options._slugs;
+        if (!slugList) return;
+        const yScale = chart.scales.y;
+        const ctx = chart.ctx;
+        const underlineColor = getCSSVar('--border');
+        ctx.save();
+        ctx.strokeStyle = underlineColor;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < yScale.ticks.length; i++) {
+          if (!slugList[i]) continue;
+          const yPixel = yScale.getPixelForTick(i);
+          const label = yScale.getLabelForValue(i);
+          ctx.font = '10px ' + Chart.defaults.font.family;
+          const textW = ctx.measureText(label).width;
+          const x = yScale.right - textW - 2;
+          ctx.beginPath();
+          ctx.moveTo(x, yPixel + 7);
+          ctx.lineTo(x + textW, yPixel + 7);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    };
+
+    const linkedLabelColor = getCSSVar('--text-primary');
+
+    /* Helper: attach label-hover embed to a horizontal bar chart */
+    function attachLabelHover(chart, slugs) {
+      const canvas = chart.canvas;
+      let hoveredIdx = -1;
+      canvas.addEventListener('mousemove', (e) => {
+        const yScale = chart.scales.y;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        /* Only trigger when cursor is in the y-axis label area */
+        if (mx > yScale.right) {
+          if (hoveredIdx !== -1) { hoveredIdx = -1; canvas.style.cursor = 'default'; hideEmbedPopover(); }
+          return;
+        }
+        let found = -1;
+        for (let i = 0; i < yScale.ticks.length; i++) {
+          const yPixel = yScale.getPixelForTick(i);
+          if (Math.abs(my - yPixel) < 14) { found = i; break; }
+        }
+        if (found !== hoveredIdx) {
+          hoveredIdx = found;
+          if (found >= 0 && slugs[found]) {
+            canvas.style.cursor = 'pointer';
+            clearTimeout(embedTimeout);
+            const yPixel = yScale.getPixelForTick(found);
+            showEmbedPopover({ x: rect.left + yScale.right, y: rect.top + yPixel }, slugs[found]);
+          } else {
+            canvas.style.cursor = 'default';
+            hideEmbedPopover();
+          }
+        }
+      });
+      canvas.addEventListener('mouseleave', () => { hoveredIdx = -1; canvas.style.cursor = 'default'; hideEmbedPopover(); });
+    }
+
     /* Winners */
     const winnerSlugs = winners.map(p => p.slug);
     const ctxW = $('#chart-winners').getContext('2d');
     const chartW = new Chart(ctxW, {
       type: 'bar',
+      plugins: [labelUnderlinePlugin],
       data: {
         labels: winners.map(p => (p.title || '').slice(0, 22)),
         datasets: [{
@@ -420,25 +496,10 @@
         }],
       },
       options: {
+        _slugs: winnerSlugs,
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        onHover: function (e, elements) {
-          const canvas = e.chart.canvas;
-          if (elements.length > 0) {
-            const idx = elements[0].index;
-            const slug = winnerSlugs[idx];
-            canvas.style.cursor = slug ? 'pointer' : 'default';
-            if (slug) {
-              clearTimeout(embedTimeout);
-              const canvasRect = canvas.getBoundingClientRect();
-              showEmbedPopover({ x: canvasRect.left + canvasRect.width / 2, y: canvasRect.top + elements[0].element.y }, slug);
-            }
-          } else {
-            canvas.style.cursor = 'default';
-            hideEmbedPopover();
-          }
-        },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (ctx) => formatUSD(ctx.raw) } },
@@ -450,18 +511,23 @@
           },
           y: {
             grid: { display: false },
-            ticks: { font: { size: 10 } },
+            ticks: {
+              font: { size: 10 },
+              color: (ctx) => winnerSlugs[ctx.index] ? linkedLabelColor : getCSSVar('--chart-label'),
+            },
           },
         },
       },
     });
     chartInstances.push(chartW);
+    attachLabelHover(chartW, winnerSlugs);
 
     /* Losers */
     const loserSlugs = losers.map(p => p.slug);
     const ctxL = $('#chart-losers').getContext('2d');
     const chartL = new Chart(ctxL, {
       type: 'bar',
+      plugins: [labelUnderlinePlugin],
       data: {
         labels: losers.map(p => (p.title || '').slice(0, 22)),
         datasets: [{
@@ -472,25 +538,10 @@
         }],
       },
       options: {
+        _slugs: loserSlugs,
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        onHover: function (e, elements) {
-          const canvas = e.chart.canvas;
-          if (elements.length > 0) {
-            const idx = elements[0].index;
-            const slug = loserSlugs[idx];
-            canvas.style.cursor = slug ? 'pointer' : 'default';
-            if (slug) {
-              clearTimeout(embedTimeout);
-              const canvasRect = canvas.getBoundingClientRect();
-              showEmbedPopover({ x: canvasRect.left + canvasRect.width / 2, y: canvasRect.top + elements[0].element.y }, slug);
-            }
-          } else {
-            canvas.style.cursor = 'default';
-            hideEmbedPopover();
-          }
-        },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (ctx) => formatUSD(ctx.raw) } },
@@ -502,12 +553,16 @@
           },
           y: {
             grid: { display: false },
-            ticks: { font: { size: 10 } },
+            ticks: {
+              font: { size: 10 },
+              color: (ctx) => loserSlugs[ctx.index] ? linkedLabelColor : getCSSVar('--chart-label'),
+            },
           },
         },
       },
     });
     chartInstances.push(chartL);
+    attachLabelHover(chartL, loserSlugs);
   }
 
   function renderTradeVolume(trades) {
