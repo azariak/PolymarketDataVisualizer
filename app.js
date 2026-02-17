@@ -200,11 +200,12 @@
   let lastData = null;
 
   async function loadPortfolio(address) {
-    const [positions, closedPositions, trades, activity] = await Promise.all([
+    const [positions, closedPositions, trades, activity, leaderboard] = await Promise.all([
       fetchAllPages('/positions?', address, ENDPOINT_CONFIG.positions).catch(() => []),
       fetchAllPages('/closed-positions?', address, ENDPOINT_CONFIG.closedPositions).catch(() => []),
       fetchAllPages('/trades?', address, ENDPOINT_CONFIG.trades).catch(() => []),
       fetchAllPages('/activity?', address, ENDPOINT_CONFIG.activity).catch(() => []),
+      fetchJSON(`/v1/leaderboard?user=${address}&timePeriod=ALL`).catch(() => []),
     ]);
 
     let quickValue = null;
@@ -212,14 +213,14 @@
       quickValue = await fetchJSON(`/value?user=${address}`);
     } catch (_) {}
 
-    const data = { positions, closedPositions, trades, activity, quickValue };
+    const data = { positions, closedPositions, trades, activity, quickValue, leaderboard };
     lastData = data;
     return data;
   }
 
   /* ---------- METRICS ---------- */
   function computeMetrics(data) {
-    const { positions, closedPositions } = data;
+    const { positions, closedPositions, leaderboard } = data;
 
     const totalValue = positions.reduce((s, p) => s + Number(p.currentValue || 0), 0);
     const unrealizedPnl = positions.reduce((s, p) => s + Number(p.cashPnl || 0), 0);
@@ -233,7 +234,10 @@
     const costBasis = totalValue - unrealizedPnl;
     const returnPct = costBasis > 0 ? totalPnl / costBasis : 0;
 
+    const rank = leaderboard && leaderboard[0] ? leaderboard[0].rank : null;
+
     return {
+      rank,
       totalValue,
       unrealizedPnl,
       realizedPnl,
@@ -245,6 +249,9 @@
   }
 
   function renderMetrics(m) {
+    const rk = $('#m-rank');
+    rk.textContent = m.rank ? '#' + Number(m.rank).toLocaleString() : '—';
+
     const tv = $('#m-total-value');
     const up = $('#m-unrealized-pnl');
     const rp = $('#m-realized-pnl');
