@@ -52,6 +52,9 @@
   let closedSortKey = 'timestamp';
   let closedSortDir = 'desc';
   let closedPositionsData = [];
+  let activePage = 1;
+  let closedPage = 1;
+  const PAGE_SIZE = 50;
 
   /* ---------- THEME ---------- */
   function getTheme() {
@@ -902,7 +905,12 @@
       return sortDir === 'asc' ? va - vb : vb - va;
     });
 
-    tbody.innerHTML = sorted.map(p => {
+    const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+    if (activePage > totalPages) activePage = totalPages;
+    const start = (activePage - 1) * PAGE_SIZE;
+    const page = sorted.slice(start, start + PAGE_SIZE);
+
+    tbody.innerHTML = page.map(p => {
       const cv = Number(p.currentValue || 0);
       const cpnl = Number(p.cashPnl || 0);
       const ppnl = Number(p.percentPnl || 0);
@@ -921,6 +929,11 @@
         <td>${formatDate(p.endDate)}</td>
       </tr>`;
     }).join('');
+
+    renderPagination('active', activePage, totalPages, (p) => {
+      activePage = p;
+      renderActiveTable(positions, sortKey, sortDir);
+    });
   }
 
   function renderClosedTable(closedPositions, sortKey, sortDir) {
@@ -950,7 +963,12 @@
       return sortDir === 'asc' ? va - vb : vb - va;
     });
 
-    tbody.innerHTML = sorted.map(p => {
+    const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+    if (closedPage > totalPages) closedPage = totalPages;
+    const start = (closedPage - 1) * PAGE_SIZE;
+    const page = sorted.slice(start, start + PAGE_SIZE);
+
+    tbody.innerHTML = page.map(p => {
       const rpnl = Number(p.realizedPnl || 0);
       const outcomeClass = (p.outcome || '').toLowerCase() === 'yes' ? 'outcome-yes' :
                            (p.outcome || '').toLowerCase() === 'no' ? 'outcome-no' : '';
@@ -962,6 +980,71 @@
         <td>${formatDate(p.timestamp)}</td>
       </tr>`;
     }).join('');
+
+    renderPagination('closed', closedPage, totalPages, (p) => {
+      closedPage = p;
+      renderClosedTable(closedPositions, sortKey, sortDir);
+    });
+  }
+
+  /* ---------- PAGINATION ---------- */
+  function renderPagination(prefix, currentPage, totalPages, onPage) {
+    const containerId = prefix + '-pagination';
+    let container = document.getElementById(containerId);
+
+    if (totalPages <= 1) {
+      if (container) container.remove();
+      return;
+    }
+
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      container.className = 'table-pagination';
+      const tableSection = document.getElementById(prefix + '-table').closest('.table-section');
+      tableSection.appendChild(container);
+    }
+
+    let html = '';
+    html += '<button class="page-btn' + (currentPage <= 1 ? ' disabled' : '') + '" data-page="prev">&lsaquo; Prev</button>';
+
+    const maxVisible = 7;
+    let startP = 1, endP = totalPages;
+    if (totalPages > maxVisible) {
+      startP = Math.max(1, currentPage - 3);
+      endP = Math.min(totalPages, startP + maxVisible - 1);
+      if (endP - startP < maxVisible - 1) startP = Math.max(1, endP - maxVisible + 1);
+    }
+
+    if (startP > 1) {
+      html += '<button class="page-btn" data-page="1">1</button>';
+      if (startP > 2) html += '<span class="page-ellipsis">&hellip;</span>';
+    }
+    for (let i = startP; i <= endP; i++) {
+      html += '<button class="page-btn' + (i === currentPage ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+    }
+    if (endP < totalPages) {
+      if (endP < totalPages - 1) html += '<span class="page-ellipsis">&hellip;</span>';
+      html += '<button class="page-btn" data-page="' + totalPages + '">' + totalPages + '</button>';
+    }
+
+    html += '<button class="page-btn' + (currentPage >= totalPages ? ' disabled' : '') + '" data-page="next">Next &rsaquo;</button>';
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.page-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('disabled')) return;
+        const val = btn.dataset.page;
+        let newPage = currentPage;
+        if (val === 'prev') newPage = currentPage - 1;
+        else if (val === 'next') newPage = currentPage + 1;
+        else newPage = parseInt(val, 10);
+        if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+          onPage(newPage);
+        }
+      });
+    });
   }
 
   /* ---------- EMBED POPOVER ---------- */
@@ -969,6 +1052,7 @@
   let embedTimeout = null;
   let embedShowTimeout = null;
   let activeEmbedCell = null;
+  let embedLocked = false;
 
   function createEmbedPopover() {
     if (embedPopover) return embedPopover;
@@ -979,8 +1063,10 @@
 
     embedPopover.addEventListener('mouseenter', () => {
       clearTimeout(embedTimeout);
+      embedLocked = true;
     });
     embedPopover.addEventListener('mouseleave', () => {
+      embedLocked = false;
       hideEmbedPopover();
     });
 
@@ -989,6 +1075,7 @@
 
   function showEmbedPopover(anchor, slug) {
     if (!slug) return;
+    if (embedLocked) return;
     clearTimeout(embedShowTimeout);
 
     embedShowTimeout = setTimeout(() => {
@@ -1007,6 +1094,7 @@
     }
 
     pop.classList.add('visible');
+    embedLocked = true;
     activeEmbedCell = anchor;
 
     /* anchor can be a DOM element or a {x, y} point */
@@ -1039,14 +1127,26 @@
   }
 
   function hideEmbedPopover() {
+    if (embedLocked) return;
     clearTimeout(embedShowTimeout);
     embedTimeout = setTimeout(() => {
-      if (embedPopover) {
+      if (embedPopover && !embedLocked) {
         embedPopover.classList.remove('visible');
         activeEmbedCell = null;
       }
     }, 200);
   }
+
+  /* Hide embed on scroll */
+  window.addEventListener('scroll', () => {
+    if (embedPopover && embedPopover.classList.contains('visible')) {
+      embedLocked = false;
+      clearTimeout(embedShowTimeout);
+      clearTimeout(embedTimeout);
+      embedPopover.classList.remove('visible');
+      activeEmbedCell = null;
+    }
+  }, true);
 
   /* Hide embed when mouse leaves any chart canvas */
   document.addEventListener('mouseleave', (e) => {
@@ -1080,6 +1180,7 @@
         btn.classList.add('active');
         currentSortKey = btn.dataset.sort;
         currentSortDir = btn.dataset.dir;
+        activePage = 1;
         renderActiveTable(activePositions, currentSortKey, currentSortDir);
       });
     });
@@ -1091,6 +1192,7 @@
         btn.classList.add('active');
         closedSortKey = btn.dataset.sort;
         closedSortDir = btn.dataset.dir;
+        closedPage = 1;
         renderClosedTable(closedPositionsData, closedSortKey, closedSortDir);
       });
     });
@@ -1131,6 +1233,8 @@
       /* Tables */
       activePositions = data.positions;
       closedPositionsData = data.closedPositions;
+      activePage = 1;
+      closedPage = 1;
       renderActiveTable(activePositions, currentSortKey, currentSortDir);
       renderClosedTable(closedPositionsData, closedSortKey, closedSortDir);
 

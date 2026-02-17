@@ -185,6 +185,12 @@ body {
   vertical-align: super;
 }
 
+.beta-tag-sm {
+  font-size: 0.5rem;
+  padding: 2px 5px;
+  vertical-align: middle;
+}
+
 .brand-sub {
   font-family: var(--font-body);
   font-size: 1.05rem;
@@ -749,6 +755,50 @@ body {
   padding: 44px 20px;
   color: var(--text-muted);
   font-size: 0.88rem;
+}
+
+/* ---------- TABLE PAGINATION ---------- */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 0 8px;
+}
+
+.page-btn {
+  background: var(--card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.page-btn:hover:not(.disabled):not(.active) {
+  background: var(--hover);
+  border-color: var(--text-muted);
+}
+
+.page-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.page-btn.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.page-ellipsis {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  padding: 0 4px;
 }
 
 /* ---------- ACTIVITY TIMELINE ---------- */
