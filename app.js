@@ -339,7 +339,11 @@
           tooltip: {
             callbacks: {
               title: (items) => fullLabels[items[0].dataIndex] || labels[items[0].dataIndex],
-              label: (ctx) => ' ' + formatUSD(ctx.raw),
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((s, v) => s + v, 0);
+                const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                return ' ' + formatUSD(ctx.raw) + ` (${pct}%)`;
+              },
             },
           },
         },
@@ -389,6 +393,74 @@
           hideEmbedPopover();
         });
       }
+    });
+
+    /* Download button — composites chart + legend into one PNG */
+    $('#download-alloc').addEventListener('click', (e) => {
+      e.preventDefault();
+      const chartCanvas = $('#chart-alloc-position');
+      const dpr = window.devicePixelRatio || 1;
+      const textColor = getCSSVar('--text-primary');
+      const bgColor = getCSSVar('--bg-card');
+
+      const padding = 32;
+      const swatchSize = 12;
+      const lineHeight = 22;
+      const legendFont = '13px sans-serif';
+      const chartW = chartCanvas.width / dpr;
+      const chartH = chartCanvas.height / dpr;
+      const legendTop = chartH + padding * 2;
+      const total = values.reduce((s, v) => s + v, 0);
+
+      /* Measure legend text to size the canvas */
+      const measure = document.createElement('canvas').getContext('2d');
+      measure.font = legendFont;
+      const legendLines = labels.map((lbl, i) => {
+        const full = fullLabels[i] || lbl;
+        const display = full.length > 75 ? full.slice(0, 75) + '…' : full;
+        const pct = total ? ((values[i] / total) * 100).toFixed(1) : '0.0';
+        return `${display}  ${formatUSD(values[i])} (${pct}%)`;
+      });
+      const maxTextW = Math.max(...legendLines.map(l => measure.measureText(l).width));
+      const legendW = padding + swatchSize + 8 + maxTextW + padding;
+
+      const legendH = labels.length * lineHeight + padding;
+      const totalW = Math.max(chartW + padding * 2, legendW);
+      const totalH = legendTop + legendH;
+
+      const out = document.createElement('canvas');
+      out.width = totalW * dpr;
+      out.height = totalH * dpr;
+      const cx = out.getContext('2d');
+      cx.scale(dpr, dpr);
+
+      /* Background */
+      cx.fillStyle = bgColor;
+      cx.fillRect(0, 0, totalW, totalH);
+
+      /* Title */
+      cx.fillStyle = textColor;
+      cx.font = 'bold 16px sans-serif';
+      cx.fillText('Allocation by Position', padding, padding - 8);
+
+      /* Draw chart */
+      cx.drawImage(chartCanvas, (totalW - chartW) / 2, padding, chartW, chartH);
+
+      /* Draw legend */
+      labels.forEach((lbl, i) => {
+        if (!chart.getDataVisibility(i)) return;
+        const y = legendTop + i * lineHeight;
+        cx.fillStyle = colors[i];
+        cx.fillRect(padding, y, swatchSize, swatchSize);
+        cx.fillStyle = textColor;
+        cx.font = legendFont;
+        cx.fillText(legendLines[i], padding + swatchSize + 8, y + swatchSize - 1);
+      });
+
+      const link = document.createElement('a');
+      link.download = 'allocation-by-position.png';
+      link.href = out.toDataURL('image/png');
+      link.click();
     });
   }
 

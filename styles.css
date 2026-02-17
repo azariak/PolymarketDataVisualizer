@@ -556,6 +556,24 @@ body {
   letter-spacing: -0.01em;
 }
 
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chart-download {
+  font-size: 1rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.chart-download:hover {
+  opacity: 1;
+}
+
 .chart-wrap {
   position: relative;
   height: 280px;
