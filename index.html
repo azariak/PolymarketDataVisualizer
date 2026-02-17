@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Polyfolio — Prediction Market Portfolio Viewer</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231A1612'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='22' font-weight='bold' font-style='italic' fill='%23C0503A' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +21,7 @@
     </button>
     <div class="entry-inner">
       <div class="brand-cluster anim-reveal" style="--delay: 0">
-        <h1 class="brand-title"><span class="brand-title-accent">Polyfolio</span></h1>
+        <h1 class="brand-title"><span class="brand-title-accent">Polyfolio</span> <span class="beta-tag">Beta</span></h1>
         <p class="brand-sub">Explore any Polymarket wallet. View positions, PnL,<br>allocations, and trade history — all from one screen.</p>
       </div>
       <div class="input-block anim-reveal" style="--delay: 1">
@@ -41,10 +42,9 @@
         </button>
         <p id="entry-error" class="entry-error"></p>
       </div>
-      <div class="entry-divider"></div>
-      <div class="entry-footer anim-reveal" style="--delay: 2">
-        <span>A <a href="https://github.com/azariak/PolymarketDataVisualizer" target="_blank" rel="noopener">project</a> by <a href="https://azariak.com" target="_blank" rel="noopener">Azaria Kelman</a></span>
-      </div>
+    </div>
+    <div class="entry-footer anim-reveal" style="--delay: 2">
+      <span>A <a href="https://github.com/azariak/PolymarketDataVisualizer" target="_blank" rel="noopener">project</a> by <a href="https://azariak.com" target="_blank" rel="noopener">Azaria Kelman</a></span>
     </div>
   </section>
 
@@ -121,7 +121,7 @@
 
     <div class="charts-row charts-row-full">
       <div class="chart-panel chart-panel-wide anim-card" style="--ci: 6">
-        <h3 class="panel-title">Trade Volume Over Time</h3>
+        <h3 class="panel-title">Notional Trade Volume</h3>
         <div class="chart-wrap chart-wrap-line"><canvas id="chart-volume"></canvas></div>
       </div>
     </div>

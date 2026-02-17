@@ -70,7 +70,10 @@
   function toggleTheme() {
     setTheme(getTheme() === 'light' ? 'dark' : 'light');
     if (!dashboard.classList.contains('hidden') && lastData) {
+      /* Suppress animations during theme switch */
+      dashboard.classList.add('no-anim');
       renderAllCharts(lastData);
+      requestAnimationFrame(() => dashboard.classList.remove('no-anim'));
     }
   }
 
@@ -269,13 +272,16 @@
    */
   function buildPieData(items, maxSlices) {
     if (items.length <= maxSlices) {
-      return { labels: items.map(i => i.label), values: items.map(i => i.value) };
+      return { labels: items.map(i => i.label), fullLabels: items.map(i => i.fullLabel || i.label), slugs: items.map(i => i.slug || null), values: items.map(i => i.value) };
     }
     const top = items.slice(0, maxSlices - 1);
     const rest = items.slice(maxSlices - 1);
     const otherValue = rest.reduce((s, i) => s + i.value, 0);
+    const otherNames = rest.map(i => i.fullLabel || i.label);
     return {
       labels: [...top.map(i => i.label), `Other (${rest.length})`],
+      fullLabels: [...top.map(i => i.fullLabel || i.label), `Other: ${otherNames.join(', ')}`],
+      slugs: [...top.map(i => i.slug || null), null],
       values: [...top.map(i => i.value), otherValue],
     };
   }
@@ -286,14 +292,21 @@
     const labelColor = getCSSVar('--chart-label');
 
     const sorted = [...positions]
-      .map(p => ({
-        label: ((p.title || 'Unknown').slice(0, 30)) + (p.outcome ? ` (${p.outcome})` : ''),
-        value: Number(p.currentValue || 0),
-      }))
+      .map(p => {
+        const full = (p.title || 'Unknown') + (p.outcome ? ` (${p.outcome})` : '');
+        return {
+          label: full.length > 30 ? full.slice(0, 30) + '…' : full,
+          fullLabel: full,
+          slug: p.slug || null,
+          value: Number(p.currentValue || 0),
+        };
+      })
       .filter(p => p.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    const { labels, values } = buildPieData(sorted, 14);
+    const { labels, fullLabels, slugs, values } = buildPieData(sorted, 14);
+
+    let pieHoverTimeout = null;
 
     const chart = new Chart(ctx, {
       type: 'doughnut',
@@ -310,9 +323,46 @@
         responsive: true,
         maintainAspectRatio: false,
         cutout: '55%',
+        onHover: function (e, elements) {
+          const canvas = e.chart.canvas;
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const slug = slugs[idx];
+            canvas.style.cursor = slug ? 'pointer' : 'default';
+            if (slug) {
+              clearTimeout(pieHoverTimeout);
+              clearTimeout(embedTimeout);
+              const canvasRect = canvas.getBoundingClientRect();
+              const pt = { x: canvasRect.left + elements[0].element.x, y: canvasRect.top + elements[0].element.y };
+              showEmbedPopover(pt, slug);
+            } else {
+              hideEmbedPopover();
+            }
+          } else {
+            canvas.style.cursor = 'default';
+            pieHoverTimeout = setTimeout(() => hideEmbedPopover(), 100);
+          }
+        },
         plugins: {
           legend: {
             position: 'right',
+            onHover: function (e, legendItem) {
+              const canvas = e.chart.canvas;
+              canvas.title = fullLabels[legendItem.index] || '';
+              canvas.style.cursor = 'pointer';
+              const slug = slugs[legendItem.index];
+              if (slug) {
+                clearTimeout(embedTimeout);
+                const canvasRect = canvas.getBoundingClientRect();
+                showEmbedPopover({ x: canvasRect.right - 80, y: canvasRect.top + 40 }, slug);
+              }
+            },
+            onLeave: function (e) {
+              const canvas = e.chart.canvas;
+              canvas.title = '';
+              canvas.style.cursor = 'default';
+              hideEmbedPopover();
+            },
             labels: {
               boxWidth: 10,
               padding: 8,
@@ -334,6 +384,7 @@
           },
           tooltip: {
             callbacks: {
+              title: (items) => fullLabels[items[0].dataIndex] || labels[items[0].dataIndex],
               label: (ctx) => ' ' + formatUSD(ctx.raw),
             },
           },
@@ -350,8 +401,8 @@
 
     /* Combine active (cashPnl) and closed (realizedPnl) positions */
     const allPnl = [
-      ...positions.map(p => ({ title: p.title, pnl: Number(p.cashPnl || 0) })),
-      ...closedPositions.map(p => ({ title: p.title, pnl: Number(p.realizedPnl || 0) })),
+      ...positions.map(p => ({ title: p.title, slug: p.slug || null, pnl: Number(p.cashPnl || 0) })),
+      ...closedPositions.map(p => ({ title: p.title, slug: p.slug || null, pnl: Number(p.realizedPnl || 0) })),
     ].filter(p => p.pnl !== 0);
 
     const sorted = [...allPnl].sort((a, b) => b.pnl - a.pnl);
@@ -360,6 +411,7 @@
     const losers = sorted.filter(p => p.pnl < 0).slice(-5).reverse();
 
     /* Winners */
+    const winnerSlugs = winners.map(p => p.slug);
     const ctxW = $('#chart-winners').getContext('2d');
     const chartW = new Chart(ctxW, {
       type: 'bar',
@@ -376,6 +428,22 @@
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        onHover: function (e, elements) {
+          const canvas = e.chart.canvas;
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const slug = winnerSlugs[idx];
+            canvas.style.cursor = slug ? 'pointer' : 'default';
+            if (slug) {
+              clearTimeout(embedTimeout);
+              const canvasRect = canvas.getBoundingClientRect();
+              showEmbedPopover({ x: canvasRect.left + canvasRect.width / 2, y: canvasRect.top + elements[0].element.y }, slug);
+            }
+          } else {
+            canvas.style.cursor = 'default';
+            hideEmbedPopover();
+          }
+        },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (ctx) => formatUSD(ctx.raw) } },
@@ -395,6 +463,7 @@
     chartInstances.push(chartW);
 
     /* Losers */
+    const loserSlugs = losers.map(p => p.slug);
     const ctxL = $('#chart-losers').getContext('2d');
     const chartL = new Chart(ctxL, {
       type: 'bar',
@@ -411,6 +480,22 @@
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        onHover: function (e, elements) {
+          const canvas = e.chart.canvas;
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const slug = loserSlugs[idx];
+            canvas.style.cursor = slug ? 'pointer' : 'default';
+            if (slug) {
+              clearTimeout(embedTimeout);
+              const canvasRect = canvas.getBoundingClientRect();
+              showEmbedPopover({ x: canvasRect.left + canvasRect.width / 2, y: canvasRect.top + elements[0].element.y }, slug);
+            }
+          } else {
+            canvas.style.cursor = 'default';
+            hideEmbedPopover();
+          }
+        },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (ctx) => formatUSD(ctx.raw) } },
@@ -433,6 +518,7 @@
   function renderTradeVolume(trades) {
     const ctx = $('#chart-volume').getContext('2d');
     const amberColor = getCSSVar('--amber');
+    const amberMuted = getCSSVar('--amber-muted');
     const gridColor = getCSSVar('--chart-grid');
     const gridLightColor = getCSSVar('--chart-grid-light');
 
@@ -446,7 +532,7 @@
       return;
     }
 
-    /* Bucket trades by day */
+    /* Bucket trades by day — notional volume (size * price) */
     const dayMap = {};
     trades.forEach(t => {
       const d = new Date(t.timestamp || t.createdAt || 0);
@@ -458,6 +544,12 @@
     const sortedDays = Object.keys(dayMap).sort();
     const values = sortedDays.map(d => dayMap[d]);
 
+    /* 7-day rolling average */
+    const ma7 = values.map((_, i) => {
+      const window = values.slice(Math.max(0, i - 6), i + 1);
+      return window.reduce((s, v) => s + v, 0) / window.length;
+    });
+
     const chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -465,24 +557,49 @@
           const dt = new Date(d + 'T00:00:00');
           return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }),
-        datasets: [{
-          data: values,
-          borderColor: amberColor,
-          backgroundColor: amberColor + '14', /* ~8% opacity */
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          borderWidth: 2,
-        }],
+        datasets: [
+          {
+            label: 'Daily Volume',
+            data: values,
+            borderColor: amberColor,
+            backgroundColor: amberColor + '14',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            borderWidth: 1.5,
+          },
+          {
+            label: '7d Avg',
+            data: ma7,
+            borderColor: amberMuted,
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            borderWidth: 2,
+            borderDash: [6, 3],
+          },
+        ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true,
+            labels: {
+              boxWidth: 12,
+              padding: 16,
+              font: { size: 10 },
+              usePointStyle: true,
+            },
+          },
           tooltip: {
-            callbacks: { label: (ctx) => 'Volume: ' + formatUSD(ctx.raw) },
+            callbacks: {
+              label: (ctx) => ctx.dataset.label + ': ' + formatUSD(ctx.raw),
+            },
           },
         },
         scales: {
@@ -552,8 +669,9 @@
       const ppnl = Number(p.percentPnl || 0);
       const outcomeClass = (p.outcome || '').toLowerCase() === 'yes' ? 'outcome-yes' :
                            (p.outcome || '').toLowerCase() === 'no' ? 'outcome-no' : '';
+      const slugAttr = p.slug ? ` data-slug="${escapeHTML(p.slug)}"` : '';
       return `<tr>
-        <td class="td-title" title="${escapeHTML(p.title)}">${escapeHTML(p.title)}</td>
+        <td class="td-title"${slugAttr} title="${escapeHTML(p.title)}">${escapeHTML(p.title)}</td>
         <td class="td-outcome ${outcomeClass}">${escapeHTML(p.outcome)}</td>
         <td class="td-num">${Number(p.size || 0).toFixed(2)}</td>
         <td class="td-num">${Number(p.avgPrice || 0).toFixed(3)}</td>
@@ -597,14 +715,122 @@
       const rpnl = Number(p.realizedPnl || 0);
       const outcomeClass = (p.outcome || '').toLowerCase() === 'yes' ? 'outcome-yes' :
                            (p.outcome || '').toLowerCase() === 'no' ? 'outcome-no' : '';
+      const slugAttr = p.slug ? ` data-slug="${escapeHTML(p.slug)}"` : '';
       return `<tr>
-        <td class="td-title" title="${escapeHTML(p.title)}">${escapeHTML(p.title)}</td>
+        <td class="td-title"${slugAttr} title="${escapeHTML(p.title)}">${escapeHTML(p.title)}</td>
         <td class="td-outcome ${outcomeClass}">${escapeHTML(p.outcome)}</td>
         <td class="td-num ${pnlClass(rpnl)}">${formatUSD(rpnl)}</td>
         <td>${formatDate(p.timestamp)}</td>
       </tr>`;
     }).join('');
   }
+
+  /* ---------- EMBED POPOVER ---------- */
+  let embedPopover = null;
+  let embedTimeout = null;
+  let embedShowTimeout = null;
+  let activeEmbedCell = null;
+
+  function createEmbedPopover() {
+    if (embedPopover) return embedPopover;
+    embedPopover = document.createElement('div');
+    embedPopover.className = 'embed-popover';
+    embedPopover.innerHTML = '<iframe class="embed-iframe" frameborder="0"></iframe>';
+    document.body.appendChild(embedPopover);
+
+    embedPopover.addEventListener('mouseenter', () => {
+      clearTimeout(embedTimeout);
+    });
+    embedPopover.addEventListener('mouseleave', () => {
+      hideEmbedPopover();
+    });
+
+    return embedPopover;
+  }
+
+  function showEmbedPopover(anchor, slug) {
+    if (!slug) return;
+    clearTimeout(embedShowTimeout);
+
+    embedShowTimeout = setTimeout(() => {
+      _revealEmbed(anchor, slug);
+    }, 1000);
+  }
+
+  function _revealEmbed(anchor, slug) {
+    const pop = createEmbedPopover();
+    const theme = getTheme();
+    const iframe = pop.querySelector('.embed-iframe');
+    const src = `https://embed.polymarket.com/market.html?market=${encodeURIComponent(slug)}&features=volume,chart&theme=${theme}`;
+
+    if (iframe.src !== src) {
+      iframe.src = src;
+    }
+
+    pop.classList.add('visible');
+    activeEmbedCell = anchor;
+
+    /* anchor can be a DOM element or a {x, y} point */
+    const popW = 420;
+    const popH = 500;
+    let left, top;
+
+    if (anchor instanceof HTMLElement) {
+      const rect = anchor.getBoundingClientRect();
+      left = rect.left + rect.width / 2 - popW / 2;
+      top = rect.bottom + 8;
+      if (top + popH > window.innerHeight - 8) {
+        top = rect.top - popH - 8;
+      }
+    } else {
+      /* Point-based positioning (for chart hover) */
+      left = anchor.x - popW / 2;
+      top = anchor.y + 16;
+      if (top + popH > window.innerHeight - 8) {
+        top = anchor.y - popH - 16;
+      }
+    }
+
+    /* Keep within viewport horizontally */
+    if (left < 8) left = 8;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function hideEmbedPopover() {
+    clearTimeout(embedShowTimeout);
+    embedTimeout = setTimeout(() => {
+      if (embedPopover) {
+        embedPopover.classList.remove('visible');
+        activeEmbedCell = null;
+      }
+    }, 200);
+  }
+
+  /* Hide embed when mouse leaves any chart canvas */
+  document.addEventListener('mouseleave', (e) => {
+    if (e.target.tagName === 'CANVAS') {
+      hideEmbedPopover();
+    }
+  }, true);
+
+  /* Delegate hover events on title cells with data-slug */
+  document.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('.td-title[data-slug]');
+    if (!cell) return;
+    const slug = cell.dataset.slug;
+    if (!slug) return;
+    clearTimeout(embedTimeout);
+    showEmbedPopover(cell, slug);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const cell = e.target.closest('.td-title[data-slug]');
+    if (!cell) return;
+    hideEmbedPopover();
+  });
 
   /* ---------- SORT CONTROLS ---------- */
   function initSortControls() {
@@ -670,7 +896,7 @@
       renderClosedTable(closedPositionsData, closedSortKey, closedSortDir);
 
       /* Show dashboard */
-      dashAddr.textContent = truncAddr(address);
+      dashAddr.textContent = address;
       showScreen(dashboard);
 
     } catch (err) {
@@ -678,6 +904,37 @@
       showScreen(entryScreen);
       entryError.textContent = 'Failed to load portfolio. Check the address and try again.';
     }
+  }
+
+  /* ---------- RECENT LOOKUPS ---------- */
+  const RECENT_KEY = 'polyfolio-recent';
+  const MAX_RECENT = 5;
+
+  function getRecentLookups() {
+    try {
+      return JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
+    } catch (_) { return []; }
+  }
+
+  function saveRecentLookup(address) {
+    const recent = getRecentLookups().filter(a => a !== address);
+    recent.unshift(address);
+    if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (_) {}
+    updateRecentDatalist();
+  }
+
+  function updateRecentDatalist() {
+    let dl = document.getElementById('recent-addresses');
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = 'recent-addresses';
+      document.body.appendChild(dl);
+      addressInput.setAttribute('list', 'recent-addresses');
+    }
+    dl.innerHTML = getRecentLookups()
+      .map(a => `<option value="${a.slice(2)}">`)
+      .join('');
   }
 
   /* ---------- INPUT VALIDATION ---------- */
@@ -713,6 +970,7 @@
       return;
     }
     entryError.textContent = '';
+    saveRecentLookup(addr);
     updateURL(addr);
     analyze(addr);
   });
@@ -800,6 +1058,7 @@
 
   /* ---------- INIT ---------- */
   initSortControls();
+  updateRecentDatalist();
   initFromURL();
 
 })();

@@ -30,8 +30,11 @@
 
   --chart-border: #FFFFFF;
   --chart-grid: rgba(26, 22, 18, 0.06);
+  --chart-grid-light: rgba(26, 22, 18, 0.03);
   --chart-grid-strong: rgba(26, 22, 18, 0.10);
   --chart-label: #6B635A;
+  --amber: #B07848;
+  --amber-muted: #8A6A50;
 
   --row-hover: rgba(192, 80, 58, 0.03);
   --shadow-sm: 0 1px 3px rgba(26, 22, 18, 0.04);
@@ -77,8 +80,11 @@
 
   --chart-border: #1E1A16;
   --chart-grid: rgba(250, 247, 242, 0.05);
+  --chart-grid-light: rgba(250, 247, 242, 0.03);
   --chart-grid-strong: rgba(250, 247, 242, 0.08);
   --chart-label: #A09888;
+  --amber: #D4944C;
+  --amber-muted: #A07840;
 
   --row-hover: rgba(212, 103, 79, 0.04);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -163,6 +169,20 @@ body {
   color: var(--accent-text);
   font-size: 4.8rem;
   line-height: 1.1;
+}
+
+.beta-tag {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 4px;
+  vertical-align: super;
 }
 
 .brand-sub {
@@ -275,7 +295,11 @@ body {
 }
 
 .entry-footer {
-  margin-top: 52px;
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  text-align: center;
   font-size: 0.75rem;
   color: var(--text-muted);
   font-weight: 400;
@@ -557,7 +581,8 @@ body {
   text-transform: uppercase;
 }
 
-.sort-btn {
+.sort-btn,
+.closed-sort-btn {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -569,12 +594,14 @@ body {
   transition: all 0.15s;
 }
 
-.sort-btn:hover {
+.sort-btn:hover,
+.closed-sort-btn:hover {
   border-color: var(--border-strong);
   color: var(--text-secondary);
 }
 
-.sort-btn.active {
+.sort-btn.active,
+.closed-sort-btn.active {
   border-color: var(--accent);
   color: var(--accent-text);
   background: var(--accent-soft);
@@ -651,6 +678,48 @@ body {
   font-size: 0.88rem;
 }
 
+/* ---------- EMBED POPOVER ---------- */
+.embed-popover {
+  position: fixed;
+  z-index: 100;
+  width: 420px;
+  height: 500px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md), 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateY(4px);
+}
+
+.embed-popover.visible {
+  opacity: 0.88;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.embed-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 12px;
+}
+
+.td-title[data-slug] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s;
+}
+
+.td-title[data-slug]:hover {
+  text-decoration-color: var(--accent);
+}
+
 /* ---------- ANIMATIONS ---------- */
 .anim-reveal {
   opacity: 0;
@@ -676,6 +745,12 @@ body {
 
 /* ---------- UTILITY ---------- */
 .hidden { display: none !important; }
+.no-anim .anim-card,
+.no-anim .anim-reveal {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
 
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 1100px) {

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(node -e:*)",
+      "WebSearch",
+      "WebFetch(domain:polymarketscan.org)",
+      "WebFetch(domain:polymarket.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:docs.polymarket.com)"
+    ]
+  }
+}
