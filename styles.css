@@ -618,6 +618,37 @@ body {
   justify-content: space-between;
 }
 
+.alloc-toggle-group {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-left: auto;
+  margin-right: 12px;
+}
+.alloc-toggle {
+  background: transparent;
+  border: none;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+.alloc-toggle:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.alloc-toggle.active {
+  background: var(--accent);
+  color: #fff;
+}
+.alloc-toggle:hover:not(.active) {
+  background: var(--bg-body);
+}
+
 .chart-download {
   color: var(--text-muted);
   text-decoration: none;

@@ -52,6 +52,7 @@
   let closedSortKey = 'timestamp';
   let closedSortDir = 'desc';
   let closedPositionsData = [];
+  let allocMode = 'current';
   let activePage = 1;
   let closedPage = 1;
   const PAGE_SIZE = 50;
@@ -340,7 +341,8 @@
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0);
-      doc.text('Allocation by Position', margin, y);
+      const allocTitle = 'Allocation by Position' + (allocMode === 'cost' ? ' (Cost Basis)' : ' (Current Value)');
+      doc.text(allocTitle, margin, y);
       y += 4;
 
       const chartY = y;
@@ -643,20 +645,31 @@
     const ctx = $('#chart-alloc-position').getContext('2d');
     const chartBorder = getCSSVar('--chart-border');
 
-    const sorted = [...positions]
+    /* Build items with both current value and cost basis */
+    const sortedCurrent = [...positions]
       .map(p => {
         const full = (p.title || 'Unknown') + (p.outcome ? ` (${p.outcome})` : '');
+        const cv = Number(p.currentValue || 0);
+        const cb = cv - Number(p.cashPnl || 0);
         return {
           label: full.length > 65 ? full.slice(0, 65) + '…' : full,
           fullLabel: full,
           slug: p.slug || null,
-          value: Number(p.currentValue || 0),
+          currentValue: cv,
+          costBasis: Math.max(cb, 0),
         };
       })
-      .filter(p => p.value > 0)
-      .sort((a, b) => b.value - a.value);
+      .filter(p => p.currentValue > 0 || p.costBasis > 0)
+      .sort((a, b) => b.currentValue - a.currentValue);
 
-    const { labels, fullLabels, slugs, values } = buildPieData(sorted, 14);
+    /* Pre-build pie data for both modes */
+    const currentItems = sortedCurrent.map(p => ({ ...p, value: p.currentValue })).filter(p => p.value > 0);
+    const costItems = sortedCurrent.map(p => ({ ...p, value: p.costBasis })).filter(p => p.value > 0);
+    const pieDataCurrent = buildPieData(currentItems, 14);
+    const pieDataCost = buildPieData(costItems, 14);
+
+    allocMode = 'current';
+    let { labels, fullLabels, slugs, values } = pieDataCurrent;
     const colors = CHART_COLORS.slice(0, labels.length);
 
     const chart = new Chart(ctx, {
@@ -735,6 +748,75 @@
       }
     });
 
+    /* Toggle between Current Value and Cost Basis */
+    function switchAllocMode(mode) {
+      allocMode = mode;
+      const pd = mode === 'cost' ? pieDataCost : pieDataCurrent;
+      labels = pd.labels;
+      fullLabels = pd.fullLabels;
+      slugs = pd.slugs;
+      values = pd.values;
+
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.data.datasets[0].backgroundColor = CHART_COLORS.slice(0, labels.length);
+      chart.update();
+      rebuildLegend();
+
+      document.querySelectorAll('.alloc-toggle').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+    }
+
+    function rebuildLegend() {
+      const legendEl = document.getElementById('alloc-legend');
+      legendEl.innerHTML = '';
+      const curColors = CHART_COLORS.slice(0, labels.length);
+      labels.forEach((label, i) => {
+        const item = document.createElement('div');
+        item.className = 'alloc-legend-item';
+        const slug = slugs[i];
+        if (slug) item.dataset.slug = slug;
+
+        const swatch = document.createElement('span');
+        swatch.className = 'alloc-legend-swatch';
+        swatch.style.backgroundColor = curColors[i];
+
+        const text = document.createElement('span');
+        text.className = 'alloc-legend-text' + (slug ? ' alloc-legend-link' : '');
+        const display = fullLabels[i] || label;
+        text.textContent = display.length > 75 ? display.slice(0, 75) + '…' : display;
+        text.title = display;
+
+        swatch.addEventListener('click', (e) => {
+          e.stopPropagation();
+          chart.toggleDataVisibility(i);
+          chart.update();
+          const hidden = !chart.getDataVisibility(i);
+          item.style.opacity = hidden ? '0.4' : '';
+          swatch.style.opacity = hidden ? '0.35' : '';
+        });
+
+        item.appendChild(swatch);
+        item.appendChild(text);
+        legendEl.appendChild(item);
+
+        if (slug) {
+          item.addEventListener('mouseenter', () => {
+            clearTimeout(embedTimeout);
+            showEmbedPopover(item, slug);
+          });
+          item.addEventListener('mouseleave', () => {
+            hideEmbedPopover();
+          });
+        }
+      });
+    }
+
+    document.querySelectorAll('.alloc-toggle').forEach(btn => {
+      btn.addEventListener('click', () => switchAllocMode(btn.dataset.mode));
+    });
+
     /* Download button — composites chart + legend into one PNG */
     $('#download-alloc').addEventListener('click', (e) => {
       e.preventDefault();
@@ -751,6 +833,8 @@
       const chartH = chartCanvas.height / dpr;
       const legendTop = chartH + padding * 2;
       const total = values.reduce((s, v) => s + v, 0);
+
+      const modeLabel = allocMode === 'cost' ? 'Cost Basis' : 'Current Value';
 
       /* Measure legend text to size the canvas */
       const measure = document.createElement('canvas').getContext('2d');
@@ -781,7 +865,7 @@
       /* Title */
       cx.fillStyle = textColor;
       cx.font = 'bold 16px sans-serif';
-      cx.fillText('Allocation by Position', padding, padding - 8);
+      cx.fillText(`Allocation by Position (${modeLabel})`, padding, padding - 8);
 
       /* Draw chart */
       cx.drawImage(chartCanvas, (totalW - chartW) / 2, padding, chartW, chartH);
@@ -790,7 +874,7 @@
       labels.forEach((lbl, i) => {
         if (!chart.getDataVisibility(i)) return;
         const y = legendTop + i * lineHeight;
-        cx.fillStyle = colors[i];
+        cx.fillStyle = CHART_COLORS[i] || '#999';
         cx.fillRect(padding, y, swatchSize, swatchSize);
         cx.fillStyle = textColor;
         cx.font = legendFont;
