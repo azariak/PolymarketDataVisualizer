@@ -621,29 +621,6 @@
       XLSX.utils.book_append_sheet(wb, actSheet, 'Transaction History');
     }
 
-    /* --- Daily Trade Volume Sheet --- */
-    const trades = lastData.trades || [];
-    if (trades.length) {
-      const dayMap = {};
-      trades.forEach(t => {
-        const d = new Date(t.timestamp || t.createdAt || 0);
-        const key = d.toISOString().slice(0, 10);
-        if (!dayMap[key]) dayMap[key] = 0;
-        dayMap[key] += Math.abs(Number(t.size || 0) * Number(t.price || 0));
-      });
-      const sortedDays = Object.keys(dayMap).sort();
-      const volumes = sortedDays.map(d => dayMap[d]);
-      const ma7 = volumes.map((_, i) => {
-        const w = volumes.slice(Math.max(0, i - 6), i + 1);
-        return Number((w.reduce((s, v) => s + v, 0) / w.length).toFixed(2));
-      });
-
-      const volHeader = ['Date', 'Daily Volume', '7-Day Avg'];
-      const volData = sortedDays.map((d, i) => [d, Number(volumes[i].toFixed(2)), ma7[i]]);
-      const volSheet = XLSX.utils.aoa_to_sheet([volHeader, ...volData]);
-      XLSX.utils.book_append_sheet(wb, volSheet, 'Daily Trade Volume');
-    }
-
     const filename = 'polyfolio-' + (addr.slice(0, 10) || 'report') + '.xlsx';
     XLSX.writeFile(wb, filename);
   }
