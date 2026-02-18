@@ -71,7 +71,9 @@
   }
 
   function toggleTheme() {
-    setTheme(getTheme() === 'light' ? 'dark' : 'light');
+    const newTheme = getTheme() === 'light' ? 'dark' : 'light';
+    gtag('event', 'theme_toggle', { theme: newTheme });
+    setTheme(newTheme);
     if (!dashboard.classList.contains('hidden') && lastData) {
       /* Suppress animations during theme switch */
       dashboard.classList.add('no-anim');
@@ -277,6 +279,7 @@
   function generatePDF() {
     if (!lastData) return;
     if (!window.jspdf) { alert('PDF library failed to load. Please refresh and try again.'); return; }
+    gtag('event', 'pdf_download');
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pw = doc.internal.pageSize.getWidth();
@@ -1042,6 +1045,7 @@
           if (tlSideFilters.has(side)) { tlSideFilters.delete(side); btn.classList.remove('active'); }
           else { tlSideFilters.add(side); btn.classList.add('active'); }
         }
+        gtag('event', 'filter_change', { filter_type: type || side });
         renderTimelineEvents();
       });
     });
@@ -1483,6 +1487,7 @@
         currentSortKey = btn.dataset.sort;
         currentSortDir = btn.dataset.dir;
         activePage = 1;
+        gtag('event', 'table_sort', { table: 'active', sort_key: currentSortKey });
         renderActiveTable(activePositions, currentSortKey, currentSortDir);
       });
     });
@@ -1495,6 +1500,7 @@
         closedSortKey = btn.dataset.sort;
         closedSortDir = btn.dataset.dir;
         closedPage = 1;
+        gtag('event', 'table_sort', { table: 'closed', sort_key: closedSortKey });
         renderClosedTable(closedPositionsData, closedSortKey, closedSortDir);
       });
     });
@@ -1543,6 +1549,7 @@
       /* Show dashboard */
       dashAddr.textContent = address;
       dashAddr.href = `https://polymarket.com/@${address}`;
+      gtag('event', 'portfolio_load', { address: truncAddr(address) });
       showScreen(dashboard);
 
     } catch (err) {
@@ -1626,6 +1633,7 @@
   });
 
   backBtn.addEventListener('click', () => {
+    gtag('event', 'new_lookup');
     destroyCharts();
     activePositions = [];
     closedPositionsData = [];
