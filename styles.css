@@ -619,15 +619,21 @@ body {
 }
 
 .chart-download {
-  font-size: 1rem;
   color: var(--text-muted);
   text-decoration: none;
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
 }
 .chart-download:hover {
   opacity: 1;
+}
+
+.icon-download {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .chart-wrap {
