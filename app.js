@@ -201,25 +201,6 @@
 
   let lastData = null;
 
-  async function loadPortfolio(address) {
-    const [positions, closedPositions, trades, activity, leaderboard] = await Promise.all([
-      fetchAllPages('/positions?', address, ENDPOINT_CONFIG.positions).catch(() => []),
-      fetchAllPages('/closed-positions?', address, ENDPOINT_CONFIG.closedPositions).catch(() => []),
-      fetchAllPages('/trades?', address, ENDPOINT_CONFIG.trades).catch(() => []),
-      fetchAllPages('/activity?', address, ENDPOINT_CONFIG.activity).catch(() => []),
-      fetchJSON(`/v1/leaderboard?user=${address}&timePeriod=ALL`).catch(() => []),
-    ]);
-
-    let quickValue = null;
-    try {
-      quickValue = await fetchJSON(`/value?user=${address}`);
-    } catch (_) {}
-
-    const data = { positions, closedPositions, trades, activity, quickValue, leaderboard };
-    lastData = data;
-    return data;
-  }
-
   /* ---------- METRICS ---------- */
   function computeMetrics(data) {
     const { positions, closedPositions, leaderboard } = data;
@@ -1655,35 +1636,240 @@
     }
   }
 
+  /* ---------- SKELETON HELPERS ---------- */
+  function showMetricSkeletons() {
+    ['m-total-value', 'm-return-pct', 'm-win-rate', 'm-realized-pnl',
+     'm-unrealized-pnl', 'm-rank', 'm-active', 'm-closed'].forEach(id => {
+      const el = document.getElementById(id);
+      el.textContent = '\u00A0';
+      el.classList.add('skeleton-pulse');
+      el.className = el.className.replace(/\b(positive|negative)\b/g, '').trim() + ' skeleton-pulse';
+    });
+  }
+
+  function clearMetricSkeletons() {
+    document.querySelectorAll('.metric-value.skeleton-pulse').forEach(el => {
+      el.classList.remove('skeleton-pulse');
+    });
+  }
+
+  function showChartSkeleton(canvasSelector) {
+    const canvas = $(canvasSelector);
+    if (!canvas) return;
+    const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+    canvas.style.display = 'none';
+    if (!wrap.querySelector('.chart-skeleton')) {
+      const skel = document.createElement('div');
+      skel.className = 'chart-skeleton';
+      wrap.appendChild(skel);
+    }
+  }
+
+  function clearChartSkeleton(canvasSelector) {
+    const canvas = $(canvasSelector);
+    if (!canvas) return;
+    canvas.style.display = '';
+    const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+    const skel = wrap.querySelector('.chart-skeleton');
+    if (skel) skel.remove();
+  }
+
+  function showTableSkeleton(tbodySelector) {
+    const tbody = $(tbodySelector);
+    if (!tbody) return;
+    const section = tbody.closest('.table-section');
+    /* Hide empty state, table content, and controls */
+    const emptyEl = section.querySelector('.empty-state');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    const controls = section.querySelector('.table-controls');
+    if (controls) controls.style.display = 'none';
+    tbody.closest('.table-scroll').style.display = 'none';
+    /* Remove old pagination if present */
+    const pag = section.querySelector('.table-pagination');
+    if (pag) pag.remove();
+    /* Show skeleton */
+    let skel = section.querySelector('.table-skeleton');
+    if (!skel) {
+      skel = document.createElement('div');
+      skel.className = 'table-skeleton';
+      for (let i = 0; i < 5; i++) {
+        const row = document.createElement('div');
+        row.className = 'table-skeleton-row';
+        skel.appendChild(row);
+      }
+      section.appendChild(skel);
+    }
+  }
+
+  function clearTableSkeleton(tbodySelector) {
+    const tbody = $(tbodySelector);
+    if (!tbody) return;
+    const section = tbody.closest('.table-section');
+    tbody.closest('.table-scroll').style.display = '';
+    const controls = section.querySelector('.table-controls');
+    if (controls) controls.style.display = '';
+    const skel = section.querySelector('.table-skeleton');
+    if (skel) skel.remove();
+  }
+
+  function showTimelineSkeleton() {
+    const container = $('#activity-timeline');
+    container.innerHTML = '';
+    const skel = document.createElement('div');
+    skel.className = 'table-skeleton';
+    for (let i = 0; i < 5; i++) {
+      const row = document.createElement('div');
+      row.className = 'table-skeleton-row';
+      skel.appendChild(row);
+    }
+    container.appendChild(skel);
+    $('#tl-filters').innerHTML = '';
+  }
+
+  function showAllocSkeleton() {
+    const canvas = $('#chart-alloc-position');
+    if (!canvas) return;
+    const col = canvas.closest('.alloc-chart-col');
+    canvas.style.display = 'none';
+    if (!col.querySelector('.chart-skeleton')) {
+      const skel = document.createElement('div');
+      skel.className = 'chart-skeleton';
+      skel.style.borderRadius = '50%';
+      col.appendChild(skel);
+    }
+    $('#alloc-legend').innerHTML = '';
+  }
+
+  function clearAllocSkeleton() {
+    const canvas = $('#chart-alloc-position');
+    if (!canvas) return;
+    canvas.style.display = '';
+    const col = canvas.closest('.alloc-chart-col');
+    const skel = col.querySelector('.chart-skeleton');
+    if (skel) skel.remove();
+  }
+
   /* ---------- MAIN FLOW ---------- */
   async function analyze(address) {
-    showScreen(loadingScreen);
-    loadingAddr.textContent = truncAddr(address);
+    /* Show dashboard immediately with skeletons */
+    dashAddr.textContent = address;
+    dashAddr.href = `https://polymarket.com/@${address}`;
 
-    try {
-      const data = await loadPortfolio(address);
+    destroyCharts();
+    chartDefaults();
 
-      /* Metrics */
-      const metrics = computeMetrics(data);
+    lastData = { positions: [], closedPositions: [], trades: [], activity: [], quickValue: null, leaderboard: [] };
+    activePositions = [];
+    closedPositionsData = [];
+
+    showMetricSkeletons();
+    showAllocSkeleton();
+    showChartSkeleton('#chart-winners');
+    showChartSkeleton('#chart-losers');
+    showChartSkeleton('#chart-volume');
+    showTimelineSkeleton();
+    showTableSkeleton('#active-tbody');
+    showTableSkeleton('#closed-tbody');
+
+    showScreen(dashboard);
+
+    /* Track how many critical fetches have arrived for metrics */
+    let positionsReady = false;
+    let closedReady = false;
+    let leaderboardReady = false;
+    function tryRenderMetrics() {
+      if (!positionsReady || !closedReady || !leaderboardReady) return;
+      clearMetricSkeletons();
+      const metrics = computeMetrics(lastData);
       renderMetrics(metrics);
+    }
 
-      /* Charts */
-      renderAllCharts(data);
+    function tryRenderWinnersLosers() {
+      if (!positionsReady || !closedReady) return;
+      clearChartSkeleton('#chart-winners');
+      clearChartSkeleton('#chart-losers');
+      if (lastData.positions.length || lastData.closedPositions.length) {
+        renderWinnersLosers(lastData.positions, lastData.closedPositions);
+      }
+    }
 
-      /* Tables */
-      activePositions = data.positions;
-      closedPositionsData = data.closedPositions;
+    /* Fire all fetches independently */
+    const positionsPromise = fetchAllPages('/positions?', address, ENDPOINT_CONFIG.positions).catch(() => []);
+    const closedPromise = fetchAllPages('/closed-positions?', address, ENDPOINT_CONFIG.closedPositions).catch(() => []);
+    const tradesPromise = fetchAllPages('/trades?', address, ENDPOINT_CONFIG.trades).catch(() => []);
+    const activityPromise = fetchAllPages('/activity?', address, ENDPOINT_CONFIG.activity).catch(() => []);
+    const leaderboardPromise = fetchJSON(`/v1/leaderboard?user=${address}&timePeriod=ALL`).catch(() => []);
+
+    /* Positions → allocation chart + active table (also needed for metrics + winners/losers) */
+    positionsPromise.then(positions => {
+      lastData.positions = positions;
+      positionsReady = true;
+
+      /* Allocation chart */
+      clearAllocSkeleton();
+      if (positions.length) {
+        renderAllocationByPosition(positions);
+      }
+
+      /* Active table */
+      activePositions = positions;
       activePage = 1;
-      closedPage = 1;
+      clearTableSkeleton('#active-tbody');
       renderActiveTable(activePositions, currentSortKey, currentSortDir);
+
+      tryRenderMetrics();
+      tryRenderWinnersLosers();
+    });
+
+    /* Closed positions → closed table (also needed for metrics + winners/losers) */
+    closedPromise.then(closedPositions => {
+      lastData.closedPositions = closedPositions;
+      closedReady = true;
+
+      closedPositionsData = closedPositions;
+      closedPage = 1;
+      clearTableSkeleton('#closed-tbody');
       renderClosedTable(closedPositionsData, closedSortKey, closedSortDir);
 
-      /* Show dashboard */
-      dashAddr.textContent = address;
-      dashAddr.href = `https://polymarket.com/@${address}`;
-      gtag('event', 'portfolio_load', { address: truncAddr(address) });
-      showScreen(dashboard);
+      tryRenderMetrics();
+      tryRenderWinnersLosers();
+    });
 
+    /* Trades → volume chart */
+    tradesPromise.then(trades => {
+      lastData.trades = trades;
+      clearChartSkeleton('#chart-volume');
+      renderTradeVolume(trades);
+    });
+
+    /* Activity → timeline */
+    activityPromise.then(activity => {
+      lastData.activity = activity;
+      renderTimeline(activity);
+    });
+
+    /* Leaderboard → rank metric */
+    leaderboardPromise.then(leaderboard => {
+      lastData.leaderboard = leaderboard;
+      leaderboardReady = true;
+      tryRenderMetrics();
+    });
+
+    /* Fetch portfolio value (non-critical) */
+    fetchJSON(`/value?user=${address}`).then(v => {
+      lastData.quickValue = v;
+    }).catch(() => {});
+
+    /* Wait for all to settle; if ALL fail, show error */
+    try {
+      const results = await Promise.allSettled([
+        positionsPromise, closedPromise, tradesPromise, activityPromise, leaderboardPromise
+      ]);
+      const allFailed = results.every(r => r.status === 'rejected');
+      if (allFailed) {
+        throw new Error('All API calls failed');
+      }
+      gtag('event', 'portfolio_load', { address: truncAddr(address) });
     } catch (err) {
       console.error(err);
       showScreen(entryScreen);
